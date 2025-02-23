@@ -23,8 +23,8 @@ class BarcodeScannerScreen extends StatelessWidget {
   const BarcodeScannerScreen({super.key});
 
   Future<void> fetchStudentData(BuildContext context, String rollNo) async {
-    final String apiUrl = 'http://192.168.227.132:5002/students/$rollNo';
-
+    // final String apiUrl = 'http://192.168.227.132:5002/students/$rollNo';
+    final String apiUrl = 'https://nitj-barcode.onrender.com/students/$rollNo';
     try {
       print(apiUrl);
       final response = await http.get(Uri.parse(apiUrl));
