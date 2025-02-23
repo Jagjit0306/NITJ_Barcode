@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 void main() {
   runApp(const MainApp());
@@ -20,6 +22,46 @@ class MainApp extends StatelessWidget {
 class BarcodeScannerScreen extends StatelessWidget {
   const BarcodeScannerScreen({super.key});
 
+  Future<void> fetchStudentData(BuildContext context, String rollNo) async {
+    final String apiUrl = 'http://192.168.227.132:5002/students/$rollNo';
+
+    try {
+      print(apiUrl);
+      final response = await http.get(Uri.parse(apiUrl));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> studentData = jsonDecode(response.body);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ResultScreen(studentData: studentData),
+          ),
+        );
+      } else {
+        _showErrorDialog(context, 'Student not found');
+      }
+    } catch (error) {
+      _showErrorDialog(context, 'Error fetching data. Please try again.');
+    }
+  }
+
+  void _showErrorDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("Error"),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -28,13 +70,10 @@ class BarcodeScannerScreen extends StatelessWidget {
         onDetect: (BarcodeCapture capture) {
           final List<Barcode> barcodes = capture.barcodes;
           if (barcodes.isNotEmpty) {
-            final String code = barcodes.first.rawValue ?? 'Unknown barcode';
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ResultScreen(result: code),
-              ),
-            );
+            final String rollNo = barcodes.first.rawValue ?? '';
+            if (rollNo.isNotEmpty) {
+              fetchStudentData(context, rollNo);
+            }
           }
         },
       ),
@@ -43,18 +82,34 @@ class BarcodeScannerScreen extends StatelessWidget {
 }
 
 class ResultScreen extends StatelessWidget {
-  final String result;
-  const ResultScreen({super.key, required this.result});
+  final Map<String, dynamic> studentData;
+  const ResultScreen({super.key, required this.studentData});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan Result')),
+      appBar: AppBar(title: const Text('Student Details')),
       body: Center(
-        child: Text(
-          'Scanned Code: $result',
-          style: const TextStyle(fontSize: 20),
-        ),
+        child:
+            studentData.isNotEmpty
+                ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Roll No: ${studentData["rollNo"] ?? "N/A"}',
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                    Text(
+                      'Name: ${studentData["name"] ?? "N/A"}',
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                    Text(
+                      'Branch: ${studentData["branch"] ?? "N/A"}',
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                  ],
+                )
+                : const Text('No data found', style: TextStyle(fontSize: 20)),
       ),
     );
   }
