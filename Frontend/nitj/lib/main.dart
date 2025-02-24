@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+
+import 'package:nitj/info_page.dart';
 
 void main() {
   runApp(const MainApp());
@@ -19,98 +19,66 @@ class MainApp extends StatelessWidget {
   }
 }
 
-class BarcodeScannerScreen extends StatelessWidget {
+class BarcodeScannerScreen extends StatefulWidget {
   const BarcodeScannerScreen({super.key});
 
-  Future<void> fetchStudentData(BuildContext context, String rollNo) async {
-    // final String apiUrl = 'http://192.168.227.132:5002/students/$rollNo';
-    final String apiUrl = 'https://nitj-barcode.onrender.com/students/$rollNo';
-    try {
-      print(apiUrl);
-      final response = await http.get(Uri.parse(apiUrl));
+  @override
+  _BarcodeScannerScreenState createState() => _BarcodeScannerScreenState();
+}
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> studentData = jsonDecode(response.body);
+class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
+  late final MobileScannerController
+  _controller; // = MobileScannerController();
+  bool _hasScanned = false;
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _controller = MobileScannerController();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_hasScanned) return; // Prevent multiple scans
+
+    final List<Barcode> barcodes = capture.barcodes;
+    if (barcodes.isNotEmpty) {
+      final String rollNo = barcodes.first.rawValue ?? '';
+      if (rollNo.isNotEmpty && rollNo.length == 8) {
+        setState(() {
+          _hasScanned = true;
+        });
+
+        _controller.stop(); // Stop the scanner
+
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ResultScreen(studentData: studentData),
+            builder: (context) {
+              return InfoPage(rno: rollNo);
+            },
           ),
-        );
-      } else {
-        _showErrorDialog(context, 'Student not found');
+        ).then((_) {
+          setState(() {
+            _hasScanned = false;
+          });
+          _controller.start(); // Resume scanning when returning
+        });
       }
-    } catch (error) {
-      _showErrorDialog(context, 'Error fetching data. Please try again.');
     }
   }
 
-  void _showErrorDialog(BuildContext context, String message) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text("Error"),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("OK"),
-              ),
-            ],
-          ),
-    );
+  @override
+  void dispose() {
+    _controller.dispose(); // Ensure proper cleanup
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan Barcode')),
-      body: MobileScanner(
-        onDetect: (BarcodeCapture capture) {
-          final List<Barcode> barcodes = capture.barcodes;
-          if (barcodes.isNotEmpty) {
-            final String rollNo = barcodes.first.rawValue ?? '';
-            if (rollNo.isNotEmpty) {
-              fetchStudentData(context, rollNo);
-            }
-          }
-        },
-      ),
-    );
-  }
-}
-
-class ResultScreen extends StatelessWidget {
-  final Map<String, dynamic> studentData;
-  const ResultScreen({super.key, required this.studentData});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Student Details')),
-      body: Center(
-        child:
-            studentData.isNotEmpty
-                ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Roll No: ${studentData["rollNo"] ?? "N/A"}',
-                      style: const TextStyle(fontSize: 20),
-                    ),
-                    Text(
-                      'Name: ${studentData["name"] ?? "N/A"}',
-                      style: const TextStyle(fontSize: 20),
-                    ),
-                    Text(
-                      'Branch: ${studentData["branch"] ?? "N/A"}',
-                      style: const TextStyle(fontSize: 20),
-                    ),
-                  ],
-                )
-                : const Text('No data found', style: TextStyle(fontSize: 20)),
-      ),
+      appBar: AppBar(title: const Text('Scan Barcode'), centerTitle: true),
+      body: MobileScanner(controller: _controller, onDetect: _onDetect),
     );
   }
 }
